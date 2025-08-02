@@ -1,0 +1,91 @@
+New model improvements:
+
+
+Progressive GAN improvements:
+
+ 
+Mode Collapse:
+Here it can so happen that generator generates a  single class object which the discriminator has a hard time detecting and so learn to map each noise to that image reducing diversity
+and its ability to generate new image. Also constantly making mistakes at same image by the discriminator will make it learn to detect exactly that kind of images eg socks since all images
+will be of socks and all will be fake so it will change its weights very steeply to detect socks in the process unlearning to detect other classes. Then since socks now are easily detected 
+so generator moves to  other class and seeing fruitful result updates its weight tremendously only to produce that image. And the  cycle goes on and on. So, its required to prevent this.
+
+For that in we can use mean sd layer near end of discriminator
+
+Here we will make a new layer that will take suppose batch size=4 images  from previous layer and each has 2 feature maps
+
+Then we can calculate sd for all images for all feature maps at each pixel to get an intuition on how much different each pixel is for the 4 images.
+Because if sd are low we know that same image is being produced by generator and discriminator and associate this pattern to fake images. If  they are high the discriminator will have hard time but still we can prevent mode collapse. For making the info available for discriminator layers to the front we calculate the mean of all sds say s and make a feature map with same h and w as other feature maps and concat it to all the images feature maps.  We take mean because it is actual representation of diverseness as if for one pixel sd is low and other it is high then its not that the images are not diverse.
+
+Equalized learning rate:
+In he initialization at the beginning we just inintialized each layers weights ny sampling from a N(0,sqrt(2/n_inputs or no of neurons in previous layer) but in here the paper stated to inintialize from N(0,1) then when each layer executes scale it by sqrt(2/n_in)
+
+Pixelwise normalization layer
+ Added after each convolutional layer in the generator. It normalizes each activation
+ based on all the activations in the same image and at the same location, but
+ across all channels (dividing by the square root of the mean squared activation).
+ In TensorFlow code, this is inputs / tf.sqrt(tf.reduce_mean(tf.square(X),
+ axis=-1, keepdims=True) + 1e-8) (the smoothing term 1e-8 is needed to
+ avoid division by zero). This technique avoids explosions in the activations due
+ to excessive competition between the generator and the discriminator.
+
+
+StyleGAN improvements:
+Here first we sample z from N(0,1) then pass it through 8 layer mlp then we have disentangled vector w.
+
+Now in generator or synthesis block we have blocks each blocks consists of upsampling layer->Conv1->Conv2
+
+suppose we have input to any intermediate block as (512,32,32) batch dimension ignored then we first upsample it to (64,64,512)
+
+then we generate noise (1,64,64) i.e for each pixel also each pixel (i,j) will have same noise value for all 512 feature maps
+
+noise_weight = (512,) Learnable
+  
+now we transform each pixel value like pixel[i,j,k_th feature map] = pixel[i,j,k_th feature map] + noise[i,j]*learnable_noise_weight[k_th feature map]
+
+now we pass the feature maps through 3x3 kernel in this conv layer to mix the info as well as reduce the feature maps by factor of 2-->(256,64,64)
+
+now we also get the style vector from w using affine transformations so style vector dim is (2*256,) and it consists of scale,bias = style_ vector[:256],style_vector[256:]
+
+now we do pixel[i,j,k] = (pixel[i,j,k]-mean[pixels of k map])/sd[pixels of k map]
+
+then pixel[i,j,k] = pixel[i,j,k]*scale[k map] + bias[k map]
+
+
+
+then we generate noise (1,64,64) i.e for each pixel also each pixel (i,j) will have same noise value for all 256 feature maps
+
+noise_weight = (256,) Learnable
+  
+now we transform each pixel value like pixel[i,j,k_th feature map] = pixel[i,j,k_th feature map] + noise[i,j]*learnable_noise_weight[k_th feature map]
+
+now we again pass the feature maps through 3x3 kernel in this conv layer to mix the info but keeping the feature map number same -->(256,64,64)
+
+now we also get the style vector from w using affine transformations so style vector dim is (2*256,) and it consists of scale,bias = style_ vector[:256],style_vector[256:]
+
+now we do pixel[i,j,k] = (pixel[i,j,k]-mean[pixels of k map])/sd[pixels of k map]
+
+then pixel[i,j,k] = pixel[i,j,k]*scale[k map] + bias[k map] 
+
+this block completed
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
