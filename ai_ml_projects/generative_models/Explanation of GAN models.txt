@@ -1,4 +1,4 @@
-New model improvements:
+ New model improvements:
 
 
 Progressive GAN improvements:
